@@ -1,103 +1,113 @@
-# lovable-agent-mcp-server
+# postgres-mcp-server
 
-Multi-agent MCP server that orchestrates a team of AI specialists (Frontend, Backend, Designer, DevOps, QA) to build SaaS apps on Lovable — from a single PRD in any format.
+An MCP (Model Context Protocol) server that lets Claude query and manipulate a PostgreSQL database using natural language.
 
-## Architecture
+Built with TypeScript, the official MCP SDK, and `pg`. Exposes a Streamable HTTP endpoint so it can be used remotely or locally with Claude Desktop / Claude Code.
 
-```
-User (PRD) → Claude → Your MCP Server → mcp.lovable.dev → Lovable Project
-                            ↓
-                    Manager Agent (Claude)
-                    ├── Frontend Agent
-                    ├── Backend Agent
-                    ├── Designer Agent
-                    ├── DevOps Agent
-                    └── QA Agent
-                            ↓
-                    Postgres (Context Manager)
-```
+---
 
-## Tools
+## ✨ What it does
+
+Once connected, you can ask Claude things like:
+
+- *"What tables do I have?"*
+- *"Show me the last 10 rows from orders"*
+- *"Insert a new user with email test@example.com"*
+- *"Update order 42 to status shipped"*
+- *"Delete all sessions where status = expired"*
+
+---
+
+## 🛠️ Tools
 
 | Tool | Description |
 |------|-------------|
-| `manager_parse_prd` | Parses a PRD (text/markdown/JSON) and creates a multi-agent task plan |
-| `manager_get_plan` | Returns the current task plan and status |
-| `agent_execute_task` | Activates a specialist agent to generate a Lovable prompt |
-| `project_get_context` | Returns full project context and event history |
-| `project_update_task_status` | Updates task status after Lovable execution |
+| `list_tables` | List all tables in the `public` schema |
+| `describe_table` | Show columns, types, nullability and defaults for a table |
+| `select_rows` | SELECT rows with optional `WHERE` clause and limit |
+| `insert_row` | INSERT a row, returns the inserted record |
+| `update_rows` | UPDATE rows matching a `WHERE` clause |
+| `delete_rows` | DELETE rows matching a `WHERE` clause |
 
-## Setup
+---
 
-### 1. Install dependencies
+## 🚀 Setup
+
+### 1. Clone and install
 
 ```bash
+git clone https://github.com/santisanti13/postgres-mcp-server.git
+cd postgres-mcp-server
 npm install
 ```
 
-### 2. Environment variables
+### 2. Configure your database
 
-```env
-ANTHROPIC_API_KEY=sk-ant-...
-DATABASE_URL=postgresql://user:pass@host:5432/db
-TRANSPORT=http        # or stdio for local dev
-PORT=3000
+Set the `DATABASE_URL` environment variable to point to your Postgres instance:
+
+```bash
+export DATABASE_URL=postgresql://localhost/your_database
 ```
 
 ### 3. Build and run
 
 ```bash
 npm run build
-npm start
+DATABASE_URL=postgresql://localhost/your_database npm start
 ```
 
-### 4. Local development (stdio)
+The server starts at `http://localhost:3000/mcp`.
 
-```bash
-TRANSPORT=stdio npm start
-```
+---
 
-## Deploy to Railway
+## 🔌 Connect to Claude
 
-1. Push to GitHub
-2. Connect repo to Railway
-3. Add environment variables
-4. Railway auto-deploys on push
+### Claude Desktop / Claude Code
 
-Add to Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+Add to your MCP config:
 
 ```json
 {
   "mcpServers": {
-    "lovable-agent": {
-      "url": "https://your-app.railway.app/mcp"
+    "postgres": {
+      "url": "http://localhost:3000/mcp"
     }
   }
 }
 ```
 
-## Usage example
+Restart Claude and start asking questions about your database in plain language.
 
-```
-User: Build a SaaS invoicing app with auth, dashboard and PDF export
+---
 
-Claude calls: manager_parse_prd({ prd: "..." })
-→ Returns TaskPlan with 7 tasks assigned to designer, backend, frontend, devops, qa
+## 🧪 Test it manually
 
-Claude calls: agent_execute_task({ project_id: "proj_abc", task_id: "t1" })
-→ Returns Lovable prompt from Designer Agent
-
-Claude sends prompt to mcp.lovable.dev → Lovable builds design system
-
-Claude calls: project_update_task_status({ ..., status: "done" })
-→ Moves to next task
+```bash
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 ```
 
-## Tech stack
+Should return the list of available tools.
 
-- Node.js + TypeScript
-- `@modelcontextprotocol/sdk` — MCP server
-- `@anthropic-ai/sdk` — Claude API (Manager + Specialist Agents)
-- `pg` — Postgres (Context Manager)
-- `express` — HTTP transport
-- `zod` — Input validation
+---
+
+## ⚠️ Notes
+
+- This server gives Claude **read and write access** to your database. Use a dedicated database/user with restricted permissions for production use.
+- `update_rows` and `delete_rows` accept raw SQL `WHERE` clauses — be careful when granting access to untrusted clients.
+
+---
+
+## 🏗️ Built with
+
+- [Model Context Protocol SDK](https://modelcontextprotocol.io)
+- [node-postgres (pg)](https://node-postgres.com/)
+- TypeScript + Express
+
+---
+
+## Author
+
+Built by **Santi** — SaaS builder, EdTech & GovTech.
