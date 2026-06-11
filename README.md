@@ -2,23 +2,23 @@
 
 An MCP (Model Context Protocol) server that lets Claude query and manipulate a PostgreSQL database using natural language.
 
-Built with TypeScript, the official MCP SDK, and `pg`. Exposes a Streamable HTTP endpoint so it can be used remotely or locally with Claude Desktop / Claude Code.
+## Architecture
 
----
+```
+User (natural language) → Claude → Your MCP Server → PostgreSQL
+                                          │
+                                    pool.query()
+                                          │
+                                  information_schema
+                                  + your tables
+```
 
-## ✨ What it does
+Claude never talks to Postgres directly. It calls a tool (e.g. `select_rows`),
+the MCP server validates and parameterizes the request, runs it against
+`pg`, and returns the result as text Claude can reason about and present back
+to the user.
 
-Once connected, you can ask Claude things like:
-
-- *"What tables do I have?"*
-- *"Show me the last 10 rows from orders"*
-- *"Insert a new user with email test@example.com"*
-- *"Update order 42 to status shipped"*
-- *"Delete all sessions where status = expired"*
-
----
-
-## 🛠️ Tools
+## Tools
 
 | Tool | Description |
 |------|-------------|
@@ -29,11 +29,9 @@ Once connected, you can ask Claude things like:
 | `update_rows` | UPDATE rows matching a `WHERE` clause |
 | `delete_rows` | DELETE rows matching a `WHERE` clause |
 
----
+## Setup
 
-## 🚀 Setup
-
-### 1. Clone and install
+### 1. Install dependencies
 
 ```bash
 git clone https://github.com/santisanti13/postgres-mcp-server.git
@@ -41,30 +39,25 @@ cd postgres-mcp-server
 npm install
 ```
 
-### 2. Configure your database
+### 2. Environment variables
 
-Set the `DATABASE_URL` environment variable to point to your Postgres instance:
-
-```bash
-export DATABASE_URL=postgresql://localhost/your_database
+```env
+DATABASE_URL=postgresql://user:pass@host:5432/db
+PORT=3000
 ```
 
 ### 3. Build and run
 
 ```bash
 npm run build
-DATABASE_URL=postgresql://localhost/your_database npm start
+npm start
 ```
 
 The server starts at `http://localhost:3000/mcp`.
 
----
+## Connect to Claude
 
-## 🔌 Connect to Claude
-
-### Claude Desktop / Claude Code
-
-Add to your MCP config:
+Add to Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
 
 ```json
 {
@@ -77,43 +70,50 @@ Add to your MCP config:
 }
 ```
 
-Restart Claude and start asking questions about your database in plain language.
+## Usage example
 
----
+```
+User: What tables do I have, and show me the last 5 rows of "orders"
 
-## 🧪 Test it manually
+Claude calls: list_tables({})
+→ Returns: ["customers", "orders", "products", ...]
 
-```bash
-curl -X POST http://localhost:3000/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+Claude calls: select_rows({ table: "orders", limit: 5, order_by: "created_at desc" })
+→ Returns: [{ id: 102, customer_id: 7, total_cents: 4900, ... }, ...]
+
+Claude presents the results as a formatted table.
 ```
 
-Should return the list of 6 available tools.
+```
+User: Mark order 42 as shipped
 
----
+Claude calls: update_rows({
+  table: "orders",
+  data: { status: "shipped" },
+  where: "id = 42"
+})
+→ Returns: "Updated 1 row(s)."
+```
 
-## ⚠️ Notes
+## Tech stack
+
+- Node.js + TypeScript
+- `@modelcontextprotocol/sdk` — MCP server
+- `pg` — PostgreSQL client
+- `express` — HTTP transport (Streamable HTTP)
+
+## Notes
 
 - This server gives Claude **read and write access** to your database. Use a dedicated database/user with restricted permissions for production use.
 - `update_rows` and `delete_rows` accept raw SQL `WHERE` clauses — be careful when granting access to untrusted clients.
-
----
-
-## 🏗️ Built with
-
-- [Model Context Protocol SDK](https://modelcontextprotocol.io)
-- [node-postgres (pg)](https://node-postgres.com/)
-- TypeScript + Express
-
----
 
 ## Related projects
 
 - [`ads-waste-auditor-mcp`](https://github.com/santisanti13/ads-waste-auditor-mcp) — a companion MCP that audits ad spend (Google Ads / Meta Ads via Windsor.ai) for wasted budget, simulates reallocation, and pauses underperforming entities.
 
----
+## About
+
+mcp conversational inputs & outputs over PostgreSQL.
 
 ## Author
 
