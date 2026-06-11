@@ -7,6 +7,7 @@ import {
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { Pool } from 'pg';
+import { ADS_AUDIT_TOOLS, handleAdsAuditTool } from './ads-audit.js';
 
 const DATABASE_URL = process.env.DATABASE_URL ?? 'postgresql://localhost/mcp_demo';
 const PORT = 3000;
@@ -86,11 +87,18 @@ const TOOLS: Tool[] = [
       required: ['table', 'where'],
     },
   },
+  ...ADS_AUDIT_TOOLS,
 ];
 
 type Args = Record<string, unknown>;
 
+const ADS_AUDIT_TOOL_NAMES = new Set(ADS_AUDIT_TOOLS.map((t) => t.name));
+
 async function handleTool(name: string, args: Args): Promise<string> {
+  if (ADS_AUDIT_TOOL_NAMES.has(name)) {
+    return handleAdsAuditTool(pool, name, args);
+  }
+
   switch (name) {
     case 'list_tables': {
       const { rows } = await pool.query(
